@@ -1,0 +1,185 @@
+---
+title: "BÀI 6.33 SÁCH JOHNSON"
+author: "Nhóm 7"
+output: word_document
+date: "2024-06-30"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Bài 6.33 trang 355-356 sách Johnson, 2013
+
+## Thư viện:
+```{r message=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(rstatix)
+library(ggpubr)
+library(broom)
+library(car)
+library(lme4)
+```
+
+## Nhập dữ liệu:
+```{r}
+data = read.table("D:/TKNC/Datasets/Datasets/T6-18.dat")
+names(data) = c("s_560nm","s_720nm","species","time","replication")
+data = data |> mutate(species = factor(species), time = factor(time))
+data
+dim(data)
+str(data)
+```
+
+## Mô tả dữ liệu:
+
+Dữ liệu về phản xạ quang phổ gồm 36 quan trắc và 5 biến:
+
+1. `s_560nm`: Phần trăm phản xạ quang phổ ở bước sóng 560nm (màu xanh lá cây)
+2. `s_720nm`: Phần trăm phản xạ quang phổ ở bước sóng 720nm (gần hồng ngoại)
+3. `species`: Giống loài (sitka spruce [SS], Japanese larch [JL], and lodgepole pine [LP])
+4. `time`: thời gian của cây con 1 tuổi lấy tại 3 thời điểm khác nhau (Julian day 150 [1], Julian day 235 [2], and Julian day 320 [3]) trong mùa sinh trưởng.
+5. `replication`: nhân rộng.
+
+Trong đó, hai biến `species` và `time` là hai nhân tố.
+
+## a.
+
+## MANOVA hai nhân tố
+```{r}
+fit_1 = manova(cbind(s_560nm,s_720nm)~species*time,data = data)
+summary(fit_1,test = "Wilks")
+```
+**Nhận xét:** Từ bảng MANOVA với mức ý nghĩa 5\%
+
+-   Kiểm định sự tương tác giữa 2 nhân tố: ta thấy p_value của tương tác 2 biến rất nhỏ (giá trị thống kê = 15.528 > 2.25 = $F_{4,52}^{5\%}$) nên ta bác bỏ giả thuyết $H_0: \gamma_{11}=\gamma_{12}=\gamma_{21}=\gamma_{22}=0$. Nghĩa là có sự tương tác giữa hai nhân tố `species` và `time`.
+
+-   Kiểm định sự ảnh hưởng của nhân tố 1 `species` lên vector phụ thuộc: ta thấy p_value rất nhỏ (giá trị thống kê = 36.571 > 2.25 = $F_{4,52}^{5\%}$) nên ta bác bỏ giả thuyết $H_0: \tau_1=\tau_2=0$, nghĩa là nhân tố 1 ảnh hưởng lên vector phụ thuộc mà ta đang xét.
+
+-   Kiểm định sự ảnh hưởng của nhân tố 2 `time` lên vector phụ thuộc: ta thấy p_value rất nhỏ (giá trị thống kê = 45.629 > 2.25 = $F_{4,52}^{5\%}$) nên ta bác bỏ giả thuyết $H_0: \beta_1=\beta_2=0$, nghĩa là nhân tố 2 ảnh hưởng lên vector phụ thuộc mà ta đang xét.
+
+## b.
+
+## Vẽ boxplot cho dữ liệu và kiểm tra giá trị ngoại lai
+
+```{r}
+# Tính phần dư cho từng biến phản hồi
+residuals <- residuals(fit_1)
+residuals
+
+# Chuyển phần dư thành data frame
+residuals_df <- data.frame(residuals)
+
+
+# Vẽ biểu đồ phần dư cho s_560nm
+ggplot(residuals_df, aes(x = s_560nm)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, fill = "blue", alpha = 0.7) +
+  labs(title = "Histogram phần dư cho s_560nm", x = "Phần dư", y = "Mật độ") +
+  theme_minimal()
+
+# Vẽ biểu đồ phần dư cho s_720nm
+ggplot(residuals_df, aes(x = s_720nm)) +
+  geom_histogram(aes(y = ..density..), binwidth = 0.5, fill = "blue", alpha = 0.7) +
+  labs(title = "Histogram phần dư cho s_720nm", x = "Phần dư", y = "Mật độ") +
+  theme_minimal()
+```
+
+**Nhận xét:** Từ biểu đồ Histogram ta thấy dữ liệu vẫn còn một vài giá trị ngoại lai, nhưng đồ thị xấp xỉ về chuẩn nên các giả định MANOVA thông thường thoả mãn đối với dữ liệu này. 
+
+## c.
+
+## Mô hình ANOVA 2 nhân tố cho biến `s_560nm`
+```{r}
+model_2 = aov(s_560nm ~ species*time,data=data)
+summary(model_2)
+```
+
+**Nhận xét:** Từ bảng ANOVA với mức ý nghĩa là 5\%: kiểm định sự tương tác của 2 nhân tố `species` và `time` ở bước sóng 560nm, với p_value rất nhỏ, nên ta không đủ cơ sở bác bỏ giả thuyết $H_0: \gamma_{11}=\gamma_{12}=\gamma_{21}=\gamma_{22}=0$. Nghĩa là không có sự tương tác giữa hai nhân tố `species` và `time` ở bước sóng 560nm.
+
+## Mô hình ANOVA 2 nhân tố cho biến `s_720nm`
+```{r}
+model_3 = aov(s_720nm ~ species*time,data=data)
+summary(model_3)
+```
+
+**Nhận xét:** Từ bảng ANOVA với mức ý nghĩa là 5\%: kiểm định sự tương tác của 2 nhân tố `species` và `time` ở bước sóng 720nm, với p_value = 0.574 > 0.05, nên ta bác bỏ giả thuyết $H_0: \gamma_{11}=\gamma_{12}=\gamma_{21}=\gamma_{22}=0$. Nghĩa là có sự tương tác giữa hai nhân tố `species` và `time` ở bước sóng 720nm.
+
+## d.
+
+Dữ liệu còn có thể phân tích bằng phương pháp đường cong tăng trưởng được thảo luận trong phần 6.4 sách Johnson. Dữ liệu cũng có thể được phân tích với giả định rằng các loài được "lồng nhau" trong ngày tháng. Từ đó ta đặt ra vấn đề: Độ phản xạ quang phổ có giống nhau đối với tất cả các loài trong mỗi ngày không?
+
+## Mô hình tuyến tính hỗn hợp với loài lồng nhau trong ngày tháng
+
+```{r}
+mixed_model_560 <- lmer(s_560nm ~ time * species + (1 | replication), data = data)
+summary(mixed_model_560)
+
+mixed_model_720 <- lmer(s_720nm ~ time * species + (1 | replication), data = data)
+summary(mixed_model_720)
+```
+
+**Nhận xét**
+
+Biến `s_560nm`:
+
+- Phương sai rất nhỏ (gần như bằng 0), điều này cho thấy rằng không có sự biến thiên lớn giữa các lần lặp lại.
+- (Intercept): 11.9250, nghĩa là giá trị trung bình của `s_560nm` khi các yếu tố khác (`time` và `species`) bằng 0.
+- `time2`: 1.4825, cho thấy rằng giá trị `s_560nm` tăng trung bình khoảng 1.4825 đơn vị từ thời điểm 1 đến thời điểm 2, nhưng không có ý nghĩa thống kê (t = 1.244).
+- `time3`: 27.4075, cho thấy rằng giá trị `s_560nm` tăng trung bình khoảng 27.4075 đơn vị từ thời điểm 1 đến thời điểm 3, và có ý nghĩa thống kê (t = 23.003).
+- `speciesLP`: -3.7000, cho thấy rằng giá trị `s_560nm` của loài LP thấp hơn trung bình khoảng 3.7000 đơn vị so với loài gốc (reference species), và có ý nghĩa thống kê (t = -3.105).
+- `speciesSS`: -3.0125, cho thấy rằng giá trị `s_560nm` của loài SS thấp hơn trung bình khoảng 3.0125 đơn vị so với loài gốc (reference species), và có ý nghĩa thống kê (t = -2.528).
+
+- Các hệ số tương tác giữa thời gian và loài:
+       
+  + `time2:speciesLP`: -1.9275 (t = -1.144)
+  + `time3:speciesLP`: -22.2200 (t = -13.187)
+  + `time2:speciesSS`: -0.0475 (t = -0.028)
+  + `time3:speciesSS`: -20.9500 (t = -12.433)
+
+- Nhìn vào các giá trị t-value và độ lớn của hệ số tương tác:
+
+  + Ở thời điểm 2, giá trị phản xạ quang phổ của loài LP và SS không khác biệt nhiều so với loài gốc (các giá trị t-value không có ý nghĩa thống kê).
+  + Ở thời điểm 3, giá trị phản xạ quang phổ của loài LP và SS khác biệt đáng kể so với loài gốc (các giá trị t-value rất lớn và có ý nghĩa thống kê).
+
+Biến `s_720nm`:
+
+- Phương sai bằng 0, cho thấy không có sự biến thiên giữa các lần lặp lại.
+- (Intercept): 32.510, nghĩa là giá trị trung bình của `s_720nm` khi các yếu tố khác (`time` và `species`) bằng 0.
+- `time2`: 6.123, cho thấy rằng giá trị `s_720nm` tăng trung bình khoảng 6.123 đơn vị từ thời điểm 1 đến thời điểm 2, nhưng không có ý nghĩa thống kê (t = 1.070).
+- `time3`: 35.525, cho thấy rằng giá trị `s_720nm` tăng trung bình khoảng 35.525 đơn vị từ thời điểm 1 đến thời điểm 3, và có ý nghĩa thống kê (t = 6.206).
+- `speciesLP`: -10.490, cho thấy rằng giá trị `s_720nm` của loài LP thấp hơn trung bình khoảng 10.490 đơn vị so với loài gốc, nhưng không có ý nghĩa thống kê (t = -1.832).
+- `speciesSS`: -13.935, cho thấy rằng giá trị `s_720nm` của loài SS thấp hơn trung bình khoảng 13.935 đơn vị so với loài gốc, và có ý nghĩa thống kê (t = -2.434).
+
+- Các hệ số tương tác giữa thời gian và loài:
+        
+  + `time2:speciesLP`: -2.995 (t = -0.370)
+  + `time3:speciesLP`: -12.252 (t = -1.513)
+  + `time2:speciesSS`: 1.232 (t = 0.152)
+  + `time3:speciesSS`: -8.150 (t = -1.007)
+
+- Nhìn vào các giá trị t-value và độ lớn của hệ số tương tác: Ở thời điểm 2 và 3, giá trị phản xạ quang phổ của loài LP và SS không khác biệt nhiều so với loài gốc (các giá trị t-value không có ý nghĩa thống kê).
+
+Kết luận:
+
+- Biến `s_560nm`:
+        
+  + Độ phản xạ quang phổ không giống nhau đối với tất cả các loài ở thời điểm 3 (có sự khác biệt đáng kể giữa các loài), nhưng ở thời điểm 2 thì không có sự khác biệt lớn giữa các loài.
+
+  + Các loài LP và SS có giá trị `s_560nm` thấp hơn so với loài gốc, và sự khác biệt này có ý nghĩa thống kê.
+
+  + Tương tác giữa thời gian và loài cũng cho thấy sự khác biệt đáng kể giữa các thời điểm và loài.
+
+- Biến `s_720nm`:
+    
+  + Độ phản xạ quang phổ tương đối giống nhau đối với tất cả các loài ở cả thời điểm 2 và 3 (không có sự khác biệt lớn giữa các loài).
+  + Loài SS có giá trị `s_720nm` thấp hơn so với loài gốc và sự khác biệt này có ý nghĩa thống kê.
+  + Tương tác giữa thời gian và loài không có nhiều ý nghĩa thống kê.
+
+Giải thích kết quả:
+
+- Sự tăng trưởng của giá trị `s_560nm` và `s_720nm` qua các thời điểm cho thấy rằng thời gian có tác động lớn đến các giá trị đo lường này.
+- Loài LP và SS có xu hướng có giá trị thấp hơn so với loài gốc, điều này có thể do các đặc điểm sinh học hoặc điều kiện môi trường khác nhau.
+- Tương tác giữa thời gian và loài cũng cho thấy rằng sự thay đổi qua các thời điểm không giống nhau giữa các loài, đặc biệt là từ thời điểm 1 đến thời điểm 3.
+
+Tóm lại: Độ phản xạ quang phổ có sự khác biệt đáng kể giữa các loài ở thời điểm 3 cho biến `s_560nm`. Tuy nhiên, với biến `s_720nm`, không có sự khác biệt lớn giữa các loài ở cả thời điểm 2 và 3. Vậy là ta đã trả lời được cho vấn đề đặt ra.

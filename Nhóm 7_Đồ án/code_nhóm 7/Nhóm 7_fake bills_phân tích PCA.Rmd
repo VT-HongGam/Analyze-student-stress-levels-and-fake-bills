@@ -1,0 +1,173 @@
+---
+title: 'PHÂN TÍCH DỮ LIỆU DỰ ĐOÁN HÓA ĐƠN GIẢ BẰNG PHƯƠNG PHÁP PHÂN TÍCH THÀNH PHẦN CHÍNH'
+author: 'Nhóm 7'
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1. PHÂN TÍCH DỮ LIỆU DỰ ĐOÁN HÓA ĐƠN GIẢ BẰNG PHƯƠNG PHÁP PHÂN TÍCH THÀNH PHẦN CHÍNH
+## Thư viện
+```{r message = F}
+library(janitor)
+library(tidyverse)
+library(FactoMineR)
+library(ggplot2)
+library(ggbiplot)
+library(ggfortify)
+library(dplyr)
+library(psych)
+library(factoextra)  #fviz
+library(base)
+library(naniar)      #gg_miss_var
+```
+
+## Dữ liệu
+```{r}
+# Nguồn dữ liệu: https://www.kaggle.com/datasets/alexandrepetit881234/fake-bills
+
+fake = read.csv("D:/TKNC/fake_bills.csv", header = TRUE, sep = ";")
+head(fake)
+names(fake)
+str(fake)
+```
+
+## Mô tả dữ liệu
+Dữ liệu dự đoán hóa đơn giả gồm 1500 quan trắc và 7 biến:
+
+1. `is_genuine`: Hóa đơn có phải hàng thật không? (TRUE/FALSE)
+2. `diagonal`: số đo đường chéo tính bằng mm
+3. `height_left`: chiều cao của cạnh trái tính bằng mm
+4. `height_right`: chiều cao của cạnh phải tính bằng mm
+5. `margin_low`: lề dưới tính bằng mm
+6. `margin_up` : lề trên tính bằng mm
+7. `length` : chu vi tính bằng mm
+
+Biến `is_genuine` được dùng để phân loại nhóm.
+
+## Kiểm tra và xử lý giá trị khuyết
+```{r}
+# Kiểm tra giá trị khuyết
+gg_miss_var(fake)
+```
+
+**Nhận xét:** Có 1 biến có giá trị khuyết là `margin_low`.
+
+```{r}
+# Loại bỏ giá trị khuyết
+fake_new = na.omit(fake)
+head(fake_new)
+dim(fake_new)
+```
+
+## Kiểm tra và xử lý giá trị ngoại lai
+```{r}
+# Kiểm tra giá trị ngoại lai
+dat_fake = fake_new[,-1]
+boxplot(dat_fake, main = "Boxplot")
+```
+
+**Nhận xét:** Nhìn vào boxplot ta thấy có khá nhiều giá trị ngoại lai.
+
+```{r}
+Check_Outliers = function(Variable){
+  Q1 = quantile(Variable,0.25)
+  Q3 = quantile(Variable,0.75)
+  IQR = Q3 - Q1
+  return (Variable <= (Q1 - (1.5 * IQR)) | Variable >= (Q3 + (1.5 * IQR)))
+}
+matr_outlier = dat_fake %>%
+  mutate(across(everything(), Check_Outliers))
+data_outlier = dat_fake[rowSums(matr_outlier) > 0,]
+head(data_outlier)
+dim(data_outlier)
+```
+**Nhận xét:** Có 53 quan trắc có chứa giá trị ngoại lai, do đó ta sẽ loại bỏ các quan trắc đó.
+
+```{r}
+# Loại bỏ giá trị ngoại lai
+dele = which(rowSums(matr_outlier)>0)
+dele
+length(dele)
+
+fake_clean = fake_new[-dele,]
+head(fake_clean)
+dim(fake_clean)
+
+boxplot(fake_clean[,-1], main = "Boxplot sau khi loại bỏ ngoại lai")
+hist(fake_clean$margin_low)
+```
+
+**Nhận xét:** Sau khi loại bỏ các quan trắc có chứa giá trị ngoại lai, vẽ lại boxplot ta thấy vẫn còn ngoại lai ở biến `margin_low`. Khi vẽ biểu đồ Histogram của `margin_low` ta thấy nó có dạng xấp xỉ dạng chuẩn nên ta sẽ không loại bỏ tiếp các giá trị ngoại lai đó.
+
+## Chuẩn hóa dữ liệu
+```{r}
+apply(fake_clean[,-1], 2, mean)
+apply(fake_clean[,-1], 2, var)
+boxplot(fake_clean[,-1], main = "Boxplot")
+```
+
+**Nhận xét:** Ta thấy phương sai của các biến nhỏ và không chênh lệch nhiều nên ta có thể phân tích dữ liệu này, không cần chuẩn hóa.
+
+```{r}
+sc_fake = as.data.frame(scale(fake_clean[,-1],scale = F))
+boxplot(sc_fake, main = "Boxplot sau khi quy tâm")
+```
+
+## Chọn thành phần chính giữ lại
+```{r}
+pca_fake = princomp(sc_fake)
+summary(pca_fake)
+```
+
+```{r}
+#screeplot
+screeplot(pca_fake,type="lines",col="blue", main="Scree plot")
+fviz_eig(pca_fake, addlabels = T, ylim = c(0,100))
+```
+
+**Nhận xét:** Qua đồ thị scree-plot ta thấy sự thay đổi rõ ràng nhất ở thành phần chính thứ nhất (PC1), PC1 đóng góp 69.1% vào phương sai suy rộng. Bên cạnh đó, thành phần chính thứ hai (PC2) đóng góp 11.4% vào phương sai, cả PC1 và PC2 giải thích được 80.5%. Do đó, ta sẽ giữ lại hai thành phần chính đầu tiên.
+
+## Loadings
+```{r}
+Load_fake = pca_fake$loadings
+Load_fake
+
+barplot(Load_fake[,1:2],beside = T, ylim = c(-1,1), main = "PC1 và PC2 loadings")
+abline(h = seq(-1,1, by = 0.2), col = "gray",lty = "dotted")
+```
+
+**Nhận xét:**
+
+1. Thành phần chính thứ nhất (PC1): Có 2 biến có độ lớn trọng số khá lớn, lớn nhất là `length` (0.826), tiếp đến là `margin_low` (-0.516). Trong đó, 1 biến có trọng số dương và 1 biến có trọng số âm, thể hiện sự tương quan nghịch của hai biến này. PC1 có thể giải thích về kích thước lề và chu vi hóa đơn.
+2. Thành phần chính thứ hai (PC2): Có biến `margin_low` có độ lớn trọng số lớn nhất và mang giá trị âm (-0.832), lớn hơn PC1. Do đó, PC2 giải thích rõ hơn về kích thước lề của hóa đơn.
+
+```{r}
+fviz_pca_var(pca_fake,
+             axes = c(1,2),
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+)
+```
+
+## Scores
+```{r}
+autoplot(pca_fake, loadings = TRUE, loadings.colour = 'blue', loadings.label = TRUE, loadings.label.size = 3,
+         colour = "is_genuine", data = fake_clean, main="Biểu đồ score cho PC1 và PC2")
+```
+
+```{r}
+table(fake_clean$is_genuine)
+
+fviz_pca_biplot(pca_fake, 
+                col.ind = fake_clean$is_genuine, palette = "jco",
+                addEllipses = TRUE, label = "var",
+                col.var = "black", repel=TRUE,
+                legend.title = "is_genuine")
+```
+
+**Nhận xét:** Nhìn vào biểu đồ ta thấy hóa đơn thật là những hóa đơn có PC1 dương, ta có thể dự đoán hóa đơn thật dựa trên chu vi. Hóa đơn giả là những hóa đơn có PC1 âm, có thể dự đoán được hóa đơn giả dựa vào kích thước lề.

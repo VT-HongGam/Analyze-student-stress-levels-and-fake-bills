@@ -1,0 +1,271 @@
+---
+title: 'MỨC ĐỘ CĂNG THẲNG CỦA SINH VIÊN'
+author: 'Nhóm 7'
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 1.	PHÂN TÍCH DỮ LIỆU NGHIÊN CỨU VỀ MỨC ĐỘ CĂNG THẲNG (STRESS) CỦA SINH VIÊN.
+## 1.1. Phân tích thành phần chính
+## Thư viện
+```{r message = F}
+library(janitor)
+library(tidyverse)
+library(FactoMineR)
+library(ggplot2)
+library(ggbiplot)
+library(ggfortify)
+library(dplyr)
+library(psych)
+library(GPArotation)
+library(factoextra)    #fviz
+library(base)
+```
+
+## Dữ liệu
+```{r}
+stress = read.csv("D:/TKNC/Datasets/Datasets/StressLevelDataset.csv")
+head(stress)
+names(stress)
+str(stress)
+dim(stress)
+
+```
+## Mô tả dữ liệu
+Dữ liệu về nghiên cứu mức độ căng thẳng (stress) của sinh viên gồm 1100 quan trắc và 21 biến:
+
+1. `anxiety-level`: mức độ lo lắng
+2. `self-esteem`: lòng tự trọng
+3. `mental-health-history`: tiền sử sức khỏe tâm thần
+4. `depression`: trầm cảm
+5. `headache`: đau đầu
+6. `blood-pressure`: huyết áp
+7. `sleep-quality`: chất lượng giấc ngủ
+8. `breathing-problem`: vấn đề hô hấp
+9. `noise-level`: mức độ ồn
+10. `living-conditions`: điều kiện sống
+11. `safety`: sự an toàn
+12. `basic-needs`: nhu cầu cơ bản
+13. `academic-performance`: thành tích học tập
+14. `study-load`: tải học tập
+15. `teacher-student-relationship`: quan hệ giữa giáo viên và học sinh
+16. `future-career-concerns`: quan ngại về nghề nghiệp tương lai
+17. `social-support`: hỗ trợ xã hội
+18. `peer-pressure`: áp lực ngang hàng
+19. `extracurricular-activities`: các hoạt động ngoại khóa
+20. `bullying`: bắt nạt
+21. `stress-level`: mức độ căng thẳng
+
+Trong đó, các biến có thể chia thành năm nhóm:
+
+- Nhóm "yếu tố tâm lý" gồm: `anxiety-level`, `self-esteem`, `mental-health-history` và `depression`.
+- Nhóm "yếu tố sinh lý" gồm: `headache`, `blood-pressure`, `sleep-quality` và `breathing-problem`.
+- Nhóm "yếu tố môi trường" gồm: `noise-level`, `living-conditions`, `safety` và `basic-needs`.
+- Nhóm "yếu tố học tập" gồm: `academic-performance`, `study-load`, `teacher-student-relationship` và `future-career-concerns`.
+- Nhóm "yếu tố xã hội" gồm: `social-support`, `peer-pressure`, `extracurricular-activities` và `bullying`.
+
+```{r}
+apply(stress,2,mean)
+```
+
+- Tập dữ liệu gồm 1100 sinh viên. Trong đó, mức độ lo lắng trung bình là 11.0636364.
+
+## Kiểm tra giá trị khuyết
+```{r}
+any(is.na(stress))
+```
+**Nhận xét:** Dữ liệu không có giá trị khuyết.
+
+## Kiểm tra giá trị ngoại lai
+```{r}
+#Boxplot
+boxplot(stress, main = "Boxplot")
+```
+
+**Nhận xét:** Nhìn vào boxplot, ta thấy giá trị ngoại lai của ba biến `noise_level`, `living_conditions` và `study_load` đều là các giá trị 0 và 5, 0 và 5 đều có chênh lệch không đáng kể so với trung bình của ba biến. Do đó, ta có thể giữ lại các giá trị ngoại lai này.
+
+**## Tiến hành phân tích dữ liệu bằng phương pháp phân tích thành phần chính.**
+
+- Biến `stress_level` được dùng để phân loại.
+
+## Phương sai
+```{r}
+dat_stress = stress[, -21]
+apply(dat_stress, 2, var)
+```
+
+**Nhận xét:** Phương sai của ba biến `anxiety_level`, `self_esteem` và `depression` lần lượt là 37.4245182, 80.0058524 và 59.7066581, lớn hơn rất nhiều so với các phương sai của các biến còn lại. Do đó, cần phải chuẩn hóa dữ liệu trước khi phân tích thành phần chính.
+
+## Chuẩn hóa dữ liệu
+```{r}
+sc_stress = as.data.frame(scale(dat_stress, scale = T))
+
+#Vẽ lại boxplot
+boxplot(sc_stress)
+```
+
+## Chọn các thành phần chính
+```{r}
+pca_stress = princomp(sc_stress, cor = T)
+summary(pca_stress)
+pca_stress$sdev^2
+```
+**Nhận xét:** Theo tiêu chuẩn Kaiser, ta sẽ giữ lại hai thành phần chính đầu tiên do chúng có phương sai lớn hơn 1.
+
+```{r}
+#screeplot
+screeplot(pca_stress,type="lines",col="blue", main="Scree plot")
+fviz_eig(pca_stress, addlabels = T, ylim = c(0,100))
+```
+
+**Nhận xét:** Qua đồ thị Screeplot, ta thấy sự thay đổi rõ ràng nhất về độ dốc ở thành phần chính thứ hai (PC2), thành phần chính thứ nhất (PC1) đóng góp 59.6% vào phương sai suy rộng. Bên cạnh đó, PC2 đóng góp 6% vào phương sai suy rộng, ta có thể phân tích thêm thành phần chính này. Cả hai thành phần chính PC1 và PC2 giải thích được 65.6% phương sai.
+
+## Loadings
+```{r}
+loading = pca_stress$loadings
+loading
+
+barplot(loading[,1],main="PC1 loadings", ylim = c(-0.4,0.4))
+abline(h = seq(-0.4,0.4, by = 0.1), col = "gray",lty = "dotted")
+```
+
+**Nhận xét:** Ở thành phần chính thứ nhất, các biến có độ lớn trọng số tương đối đồng đều nhau, chúng đều có vai trò trong PC1.
+
+- Ở nhóm "yếu tố tâm lý" có 3 biến có trọng số dương là `anxiety_level`, `mental_health_history`, `depression` và 1 biến có trọng số âm là `self_esteem`, nghĩa là chúng đối nghịch nhau. Khi một sinh viên lo lắng quá nhiều, có tiền sử sức khỏe tâm thần và trầm cảm thì họ sẽ thiếu tự tin, ý thức kém về giá trị bản thân mình, lòng tự trọng sẽ thấp dần, và ngược lại.
+- Ở nhóm "yếu tố sinh lý" có 3 biến có trọng số dương là `headache`, `blood_pressure`, `breathing_problem` và 1 biến có trọng số âm là `sleep_quality`. Khi sinh viên gặp phải các vấn đề về đau đầu, huyết áp, hô hấp thì sẽ bị ảnh hưởng đến giấc ngủ, chất lượng giấc ngủ sẽ kém, và ngược lại.
+- Ở nhóm "yếu tố môi trường" có 1 biến có trọng số dương là `noise_level` và 3 biến có trọng số âm là `living_conditions`, `safety`, `basic_needs`. Khi mức độ ồn quá lớn sẽ kéo theo điều kiện sống, sự an toàn và các nhu cầu cơ bản thấp dần, và ngược lại.
+- Ở nhóm "yếu tố học tập" có 2 biến có trọng số dương là `study_load`, `future_career_concerns` và 2 biến có trọng số âm là `academic_performance`, `teacher_student_relationship`. Khi mối quan hệ giữa giáo viên và sinh viên kém cũng như thành tích học tập không tốt sẽ dẫn đến quá tải học tập và ảnh hưởng đến quan ngại về nghề nghiệp trong tương lai, và ngược lại.
+- Ở nhóm "yếu tố xã hội" có 3 biến có trọng số dương là `peer_pressure`, `extracurricular_activities`, `bullying` và 1 biến có trọng số âm là `social_support`. Khi không nhận được hỗ trợ xã hội, sinh viên sẽ cảm thấy áp lực và có thể dẫn đến bị bắt nạt.
+
+Tóm lại, PC1 có các biến có trọng số dương khá nhiều, nếu giá trị của chúng càng lớn thì mức độ căng thẳng càng cao, ảnh hưởng không tốt cho sinh viên.
+
+```{r}
+barplot(loading[,2],main="PC2 loadings", ylim = c(-0.8,0.6))
+abline(h = seq(-0.8,0.6, by = 0.2), col = "gray",lty = "dotted")
+```
+
+**Nhận xét:** Ở thành phần chính thứ hai, có 3 biến có độ lớn trọng số khá lớn là `blood_pressure` (-0.744), `breathing_problem` (0.300) và `social_support` (0.481), chúng có đóng góp vai trò trong PC2. PC2 giải thích về sức khỏe và xã hội. 
+
+```{r}
+fviz_pca_var(pca_stress,
+             axes = c(1,2),
+             col.var = "contrib", # Color by contributions to the PC
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE     # Avoid text overlapping
+)
+```
+
+## Scores
+```{r}
+autoplot(pca_stress, loadings = TRUE, loadings.colour = 'blue', loadings.label = TRUE, loadings.label.size = 3,
+         colour = "stress_level", data = stress, main="Biểu đồ score cho PC1 và PC2")
+```
+
+**Nhận xét:** Nhìn vào biểu đồ, ta thấy các điểm bên phải có màu xanh nhạt là mức độ căng thẳng ở mức 2, có thể coi là mức độ nặng (giá trị PC1 lớn). Các điểm bên trái có màu xanh đậm là mức độ căng thẳng ở mức 0, có thể coi là không bị căng thẳng (giá trị PC1 nhỏ). Các điểm phía bên trên có màu xanh trung bình là mức độ căng thẳng ở mức 1, có thể coi là nhẹ hoặc trung bình (giá trị PC1 xấp xỉ 0).Với PC2, ta có thể thấy yếu tố xã hội có thể gây ra căng thẳng ở sinh viên ở mức độ vừa phải để tạo nên động lực có sinh viên cố gắng học tập và làm việc.
+
+## Phân tích thêm về một số thành phần chính khác
+Hai thành phần chính đầu tiên chỉ đóng góp 65.6% vào phương sai suy rộng, tám thành phần chính đầu tiên mới đóng góp được 82%. Do đó, ta phân tích thêm về sáu thành phần chính tiếp theo.
+
+```{r}
+barplot(loading[,3:4],beside = T, ylim = c(-1,1), main = "PC3 và PC4 loadings")
+abline(h = seq(-1,1, by = 0.2), col = "gray",lty = "dotted")
+```
+
+**Nhận xét:**
+
+- Thành phần chính thứ ba (PC3) có 9 biến có trọng số lớn là `noise_level` (0.274), `safety` (0.346), `basic_needs` (0.246), `academic_performance` (0.263), `study_load` (0.407), `teacher_student_relationship` (0.342), `social_support` (0.313), `peer_pressure` (0.330), `extracurricular_activities` (0.300). PC3 giải thích chủ yếu về các yếu tố môi trường, học tập và xã hội.
+- Thành phần chính thứ tư (PC4) có biến `breathing_problem` có trọng số cao nhất (0.627), giải thích chủ yếu về vấn đề sức khỏe hô hấp.
+
+```{r}
+barplot(loading[,5:6],beside = T, ylim = c(-1,1), main = "PC5 và PC6 loadings")
+abline(h = seq(-1,1, by = 0.2), col = "gray",lty = "dotted")
+```
+
+**Nhận xét:**
+
+- Thành phần chính thứ năm (PC5) có biến `living_conditions` có trọng số cao nhất(0.782), giải thích chủ yếu về vấn đề điều kiện sống.
+- Thành phần chính thứ sáu (PC6) có biến `noise_level` có trọng số cao nhất (0.710), giải thích chủ yếu về mức độ ồn.
+
+```{r}
+barplot(loading[,7:8],beside = T, ylim = c(-1,1), main = "PC7 và PC8 loadings")
+abline(h = seq(-1,1, by = 0.2), col = "gray",lty = "dotted")
+```
+
+**Nhận xét:** 
+
+- Thành phần chính thứ bảy (PC7) có biến `study_load` có trọng số cao nhất (0.600), giải thích chủ  yếu về vấn đề tải học tập.
+- Thành phần chính thứ tám (PC8) có biến `mental_health_history` có trọng số cao nhất (-0.515), giải thích chủ yếu về vấn đề sức khỏe tâm thần.
+
+
+## 1.2. Phân tích nhân tố
+## Ma trận hệ số tương quan
+```{r}
+(R = cor(stress))
+```
+Nhận xét: Ta thấy hầu như các biến đều có hệ số tương quan cao, nên ta có thể nói biến này có liên hê với nhau.
+
+## Kiểm tra dữ liệu có đủ để phân tích nhân tố:
+- Sử dụng phương pháp kiểm định KMO
+
+```{r}
+KMO(stress)
+```
+
+Nhận xét: Với MSA = 0.97 từ bảng kết quả trên được xem là kết quả khá tốt, cùng với các KMO của các biến riêng lẻ đều lớn hơn 0.6 cũng là kết quả tốt. Từ đó ta kết luận được rằng dữ liệu là đủ để phân tích nhân tố.
+
+## Xác định số nhân tố:
+Sử dụng kiểm định Kaiser để xác định số nhân tố:
+
+```{r}
+ev = eigen(R)
+print(ev$values)
+```
+Nhận xét: Với kết quả có 2 giá trị riêng đầu tiên lớn hơn 1, nên ta giữ lại hai nhân tố
+
+## Phân tích nhân tố với m = 2:
+Ta phân tích 2 nhân tố với phép quay Varimax
+
+```{r}
+fa_stress = fa(R,nfactors = 2, rotate = "varimax", residuals = TRUE, fm ="ml")
+fa_stress
+```
+*Nhận xét:*
+
+-   Nhân tố 2: Ta nhận thấy nhân tố 2 sẽ được giải thích bởi 19 biến vì tỷ trọng của 19 biến này sẽ cao hơn tỷ trọng ở nhân tố 1, vậy trừ biến blood_pressure với tỷ trọng 0.99 ở nhân tố 1 cao hơn tỷ trọng 0.12 ở nhân tố 2, và biến *socialsupport*với tỷ trọng 0.69 ở nhân tố 1 cao hơn tỷ trọng 0.51 ở nhân tố 2, thì các biến còn lại sẽ giải thích cho nhân tố 2.
+
+    -   Với các biến anxiety-level, mental-health-history, depression, headache, sleep-quality, breathing-problem, stress-level liên quan đến vấn đề sức khoẻ và tinh nhần, các biến này đều có tỷ trọng dương trừ biến sleep-quality mang tỷ trong âm, vì ta thấy các biến mang giá trị dương này nghịch biến với biến sleep-quality, vì ta thấy các biến mang tỷ trọng dương này càng cao thì sức khoẻ và tinh thần đều càng không tốt điều đó sẽ dẫn đến chất lượng giấc ngủ sẽ không được tốt, vì vậy mà hai biến này sẽ nghịch biến với nhau.Điều này còn dẫn đến nhân tố 2 sẽ cao khi cá nhân đó có sức khoẻ và tinh thần không tốt.
+    -   Với các biến self_esteem,*noise_level*, living_conditions, safety, basic-needs sẽ liên quan đến quần đề đời sống xã hội, các biến này hầu như đều mang giá trị âm, trừ mức độ ồn mang giá trị dương, vì với các biến mang giá trị âm càng cao thì ta thấy đời sống xã hội sẽ càng tốt mà đời dống xã hội tốt thì mức độ ồn sẽ càng giảm. Điều này dẫn đến nhân tố 1 sẽ thấp khi có mức sống và xã hội cao.
+    -   Với các biến còn lại academic_performance, study_load, teacher_student_relationship, future_career_concerns, peer_pressure, extracurricular_activities, bullying sẽ liên quan đến học tập, các biến hầu như đêu mang tỷ trọng dương, trừ biến academic_performance và biến teacher_student_relationship thì mang giá trị âm, ta nhận xét được khi học sinh có thành tích học tâ tốt cũng sẽ có mối quan hệ tốt với giáo viên, nhưng điều này lại nghịc biến với các biến mang giá trị dương liên quan đến học tập không được tốt. Điều này dẫn đến khi một cá nhân có học tập không tốt thì nhân tố 2 càng cao
+    -   Từ đó ta thấy nhân tố 2 sẽ giải thích cho mức độ sức khoẻ, tinh thần, đời sống, xã hội và học tập. Khi nhân tố 2 cao ta có thể nói sức khoẻ tinh thần sẽ không tốt, đời sống xa hội không tốt và học tập cũng không tốt.
+
+-   Nhân tố 1: Ta thấy nhânn tố 1 sẽ được giải thích bởi 2 biến còn lại là blood_pressure và socialsupport, vì 2 biến này có trọng số cao hơn ở trọng số ở nhân tố 2.
+
+-   Ta thấy biến  *blood_pressure* có trọng số dương, còn biến *social_support* có trọng số âm, khi đó ta nhận xét thấy nếu một người có sự trợ giúp từ bên ngoài cao thì huyết áp của người đó sẽ giảm xuống. Khi đó nhân tố 1 sẽ càng cao khi người đó có huyết áp cao và sự hỗ trợ bên ngoài sẽ giảm đi. 
+-   Nhân tố 1 sẽ chỉ sự đối lặp của sự hỗ trợ bên ngoài với huyết áp.
+
+-   Từ bảng kết quả, hai nhân tố *MR1* và *MR2* sẽ giải thích được 64% phương sai dữ liệu, trong đó *MR1* sẽ giải thích được 50% phương sai dữ liệu và *MR2* sẽ giải thích 14% còn lại.
+
+-   Với các trị riêng của *MR1* và *MR2* lần lượt là 10.57 và 2.84 thì theo tiêu chuẩn KAISER ta giữ lại hai biến này.
+
+-   Và bằng kiểm định Likelihood với prob \< 6e-104, ta sẽ bác bỏ giả thuyết $H_0$ với $H_0$ là giả định mô hình 2 nhân tố là hợp lý. Vậy ta sẽ chấp nhận $H_1$ là giả định cho việc mô hình 2 nhân tố là không hợp lý.
+
+Đồ thị mô tả cho mô hình:
+```{r}
+fa.diagram(fa_stress)
+```
+
+## Kiểm tra mô hình thích hợp hơn:
+
+Ta kiểm tra mô hình 8 nhân tố với Hệ số tương quan R.
+```{r}
+fa_stress_corr = factanal(covmat = R,factors=8, rotation="varimax", n.obs=1100)
+print(fa_stress_corr)
+```
+
+Nhận xét:
+
+-   Bằng kiểm định Likeliihood Chi Square, ta có giá trị p_value = 0.111 > 0.05 nên ta chưa đủ giả thuyết để bác bỏ $H_0$ là mô hình 8 nhân tố là phù hợp. Vậy nên ta có thể xem mô hình 8 nhân tố này với ma trận hiệp phương sai sẽ đưa ra kết quả tốt hơn.

@@ -1,0 +1,177 @@
+---
+title: "PHÂN TÍCH DỮ LIỆU DỰ ĐOÁN HÓA ĐƠN GIẢ BẰNG PHƯƠNG PHÁP PHÂN TÍCH NHÂN TỐ"
+author: "Nhóm 7"
+date: "`r Sys.Date()`"
+output: word_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Phần 2:
+
+## 2. PHÂN TÍCH DỮ LIỆU DỰ ĐOÁN HÓA ĐƠN GIẢ BẰNG PHƯƠNG PHÁP PHÂN TÍCH NHÂN TỐ
+
+## Thư viện
+
+```{r message = F}
+library(janitor)
+library(tidyverse)
+library(FactoMineR)
+library(ggplot2)
+library(ggbiplot)
+library(ggfortify)
+library(dplyr)
+library(psych)
+library(factoextra)  #fviz
+library(base)
+library(naniar)      #gg_miss_var
+library(EFA.dimensions)  #FACTORABILITY
+```
+
+## Dữ liệu
+
+```{r}
+# Nguồn dữ liệu: https://www.kaggle.com/datasets/alexandrepetit881234/fake-bills
+
+fake = read.csv("D:/TKNC/fake_bills.csv", header = TRUE, sep = ";")
+head(fake)
+dim(fake)
+str(fake)
+```
+
+## Mô tả dữ liệu
+
+Dữ liệu nghiên cứu về hoá đơn giả và thật với 1500 quan trắc và 7 biến:
+
+1. `is_genuine`: Hóa đơn có phải là hàng thật không? Đúng/sai
+2. `diagonal`: Số đo đường chéo tính bằng mm
+3. `height_left`: chiều cao của cạnh trái tính bằng mm
+4. `height_right`: chiều cao của phía bên phải tính bằng mm
+5. `margin_low`: lề dưới tính bằng mm
+6. `margin_up`: lề trên tính bằng mm
+7. `length`: tổng chiều dài tính bằng mm
+
+## Kiểm tra và xử lý giá trị khuyết
+
+```{r}
+# Kiểm tra giá trị khuyết
+gg_miss_var(fake)
+```
+
+**Nhận xét:** Ta thấy biến có giá trị khuyết là `margin_low`.
+
+```{r}
+# Loại bỏ các giá trị khuyết
+fake_new = na.omit(fake)
+head(fake_new)
+dim(fake_new)
+```
+
+*Nhận xét:* Sau khi loại bỏ các giá trị khuyết dữ liệu còn lại 1463 quan trắc và 7 biến.
+
+## Kiểm tra giá trị ngoại lai
+
+```{r}
+boxplot(fake_new[,-1])
+```
+
+**Nhận Xét:** Ta thấy dữ liệu có nhiều điểm ngoại lai, vì vậy ta cần xử lý ngoại lai. Vì dữ liệu khá lớn nên ta sẽ xoá các ngoại lai.
+
+## Kiểm tra và xử lý giá trị ngoại lai
+
+```{r}
+# Kiểm tra giá trị ngoại lai
+
+Check_Outliers = function(Variable){
+  Q1 = quantile(Variable,0.25)
+  Q3 = quantile(Variable,0.75)
+  IQR = Q3 - Q1
+  return (Variable <= (Q1 - (1.5 * IQR)) | Variable >= (Q3 + (1.5 * IQR)))
+}
+mat_outlier = (fake_new[,-1]) %>%
+  mutate(across(everything(), Check_Outliers))
+dat_outlier = (fake_new[,-1])[rowSums(mat_outlier) > 0,]
+head(dat_outlier)
+dim(dat_outlier)
+```
+
+*Nhận xét:* Có 53 quan trắc có chứa giá trị ngoại lai, do đó ta sẽ loại bỏ các quan trắc đó.
+
+```{r}
+# Loại bỏ giá trị ngoại lai
+del = which(rowSums(mat_outlier)>0)
+del
+length(del)
+
+fake_cleand = fake_new[-del,]
+head(fake_cleand)
+dim(fake_cleand)
+
+boxplot(fake_cleand[,-1])
+hist(fake_cleand$margin_low)
+
+```
+
+*Nhận xét:* Sau khi loại bỏ các quan trắc có chứa giá trị ngoại lai, vẽ lại boxplot ta thấy vẫn còn ngoại lai của biến `margin_low` nhưng biểu đồ Histogram của biến đó có dạng xấp xỉ dạng chuẩn, nên ta sẽ không loại bỏ tiếp các ngoại lai đó.
+
+```{r}
+apply(fake_cleand,2, sd)
+```
+
+**Nhận xét:** Dữ liệu có độ lệch chuẩn thấp, hay sự giao động của các biến dữ liệu không nhiều. Nên dữ liệu đã sạch và ta có thể phân tích thống kê.
+
+## Ma trận hệ số tương quan
+
+```{r}
+(R_2=cor(fake_cleand[,-1]))
+corr.test(fake_cleand[,-1],use="complete.obs")
+FACTORABILITY(fake_cleand[,-1],)
+```
+
+**Nhận xét:** Với kết quả
+
+$$\textbf{The determinant of the correlation matrix should be > 0.00001 for factorability.}$$ $$\textbf{The determinant is 0.2732442 which is > 0.00001, indicating factorability.}$$ Để các biến có tương quan với nhau thì giá trị định thức của ma trận tương quan phải \> 0.000001, với kết quả định thức của ma trận hệ số tương quan là 0.2732442 \> 0.000001, nên ta nói các biến có tương quan với nhau.
+
+## Kiểm tra dữ liệu có đủ để phân tích nhân tố:
+
+Sử dụng phương pháp kiểm định KMO
+
+```{r}
+KMO(fake_cleand[,-1])
+```
+
+**Nhận xét:** Giá trị KMO của dữ liệu là 0.78 \> 0.6, đây là một kết quả khá tốt cho dữ liệu, và các giả trị KMO các biến riêng lẻ cũng cao trên 0.6. Nên ta nói dữ liệu này đủ để phân tích nhân tố.
+
+## Xác định số nhân tố:
+
+Sử dụng kiểm định Kaiser để xác định số nhân tố:
+
+```{r}
+ev = eigen(R_2)
+print(ev$values)
+```
+
+**Nhận xét:** Bằng kiểm định Kaiser, ta sẽ giữ lại các biến có giá trị riêng lớn hơn 1, vì vậy từ kết quả trên, ta sẽ giữ lại 2 nhân tố, và thực hiện phân tích 2 nhân tố này.
+
+## Phân tích nhân tố với m = 2:
+
+Ta phân tích 2 nhân tố
+
+```{r}
+fa_fake = fa(fake_cleand[,-1],nfactors = 2, rotate = "varimax", residuals = TRUE, fm ="ml")
+fa_fake
+```
+
+***Nhận xét:***
+
+- Nhân tố 1, được giải thích bởi các biến có trọng số loadings \> 0.3 gồm các biến `height_left`, `height_weight`, `margin_low`, `margin_up`, `lenght`. Trong đó biến `lenght` mang tỷ trọng âm và các biến còn lại mang tỷ trọng dương. Bốn biến `height_left`, `height_weight`, `margin_low`, `margin_up` liên quan đến *chiều cao và lề* nên ta có tể nói nhân tố 1 chỉ sự đối lặp giữa *chiều cao, lề* với *độ dài* của hoá đơn.
+
+- Ở nhân tố 2, ta thấy trọng số loading \> 0.3 gồm biến `margin_low` và `length`, mà 2 biến này đã được giải thích cho nhân tố 1 và tỷ trọng của 2 biến này ở nhân tố 1 cũng lớn hơn, nên ta không dùng lại 2 biến này cho nhân tố 2. Ta thấy còn biến `diagonal` chưa được đưa vào giải thích cho nhân tố 1, nhưng trọng số loadings của biến này ở cả hai nhân tố đều thấp, và có giá trị **h2** rất thấp, dẫn đến việc biến này không đóng góp nhiều vào việc giải thích phương sai. Từ đó ta nên loại biến `diagonal` khỏi mô hình.
+
+- Bằng kiểm định Kaiser, ta sẽ nhận các nhân tố có trị riêng lớn hơn 1, vì vậy ta giữ lại nhân tố 1 đủ để giải thích cho phương sai tổng thể.
+
+- Theo kiểm định Likelihood với giá trị p_value \<0.056, thì ta sẽ không đủ cơ sở để bác bỏ $H_0$ với giả định mô hình 2 nhân tố là hợp lý và bac bỏ $H_1$ với giả định mô hình 2 nhân tố là không hợp lý. Vậy mô hình 2 nhân tố là hợp lý.
+
+- Ở phân tích trên ta không dùng biến `is_genuine` vì biến này đã khảo xác tính thật giả của hoá đơn, nên không cần đưa vào mô hình phân tích. Thay vào đó biến này có thể dùng để thiết lập mô hình để kiểm tra tính thật giả của hoá đơn bằng các nhân tố đã phân tích như ở trên. 
